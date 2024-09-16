@@ -1,0 +1,153 @@
+link - https://dushanthankesavan.medium.com/installing-configuring-apache-guacamole-on-amazon-linux-2-efcd0992f8f1
+
+
+*****Step 1: Check for updates*****
+# sudo yum update
+# sudo reboot
+
+
+*****Step 2: Guacamole needs dependencies if your distribution does notprovide Guacamole packages use this third party repository*******
+# sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-7.noarch.rpm
+
+
+
+*****Step 3: Download and install the required dependencies*****
+# sudo yum install -y cairo-devel libjpeg-turbo-devel libwebsockets-devel libpng-devel uuid-devel ffmpeg-devel freerdp-devel pango-devel libssh2-devel libvncserver-devel pulseaudio-libs-devel openssl-devel libvorbis-devel libwebp-devel libtool libtelnet-devel freerdp mariadb-server wget tomcat --skip-broken
+
+
+****Step 4: Download and extract the Guacamole server source code (.tar.gz) and download the Guacamole Web Application (.war)****8
+#wget https://downloads.apache.org/guacamole/1.1.0/source/guacamole-server-1.1.0.tar.gz
+#tar -xzf guacamole-server-1.1.0.tar.gz
+#wget https://downloads.apache.org/guacamole/1.1.0/binary/guacamole-1.1.0.war
+
+
+****Step 5: Compile and install the extracted file****
+#cd guacamole-server-1.1.0
+#./configure --with-init-dir=/etc/init.d
+
+****Step 6: Make/Install and update system’s cache of installed libraries***
+#make install
+#ldconfig && cd ~
+
+****Step 7: Create a symbolic link from the system’s copy of the services tomcat, mariadb and guacd file into the location on disk where looks for autostart files***
+#systemctl enable tomcat && systemctl enable mariadb && systemctl enable guacd
+
+
+****Step 8: Copy the Guacamole web application to the correct directory****
+#cp ~/guacamole-1.1.0.war /var/lib/tomcat/webapps/guacamole.war
+
+
+****Step 9: Create a new user-mapping.xml with the following command****
+#nano /etc/guacamole/user-mapping.xml
+--------------------insert this into the file-----------------------
+<user-mapping>
+    <authorize 
+            username="admin"
+            password="55b38b03e7587a45fd886977842ff9b8"
+            encoding="md5">
+        <connection name="Windows Server">
+            <protocol>rdp</protocol>
+            <param name="hostname">192.168.0.100</param>
+            <param name="port">3389</param>
+        </connection>
+    </authorize>
+</user-mapping>
+
+
+
+****Step 10: Open the firewall to allow Guacamole to connect via port 8080******
+#sudo yum install firewalld
+#sudo systemctl start firewalld
+#sudo systemctl enable firewalld
+#sudo systemctl status firewalld
+#firewall-cmd --permanent --add-port=8080/tcp
+#firewall-cmd --reload
+
+
+
+****Step 11: Configure MySQL so Guacamole can support multiple connections****
+#mkdir -p /usr/share/tomcat/.guacamole/{extensions,lib}
+#wget http://ftp.kaist.ac.kr/mysql/Downloads/Connector-J/mysql-connector-java-8.0.21.tar.gz
+#tar -xzf mysql-connector-java-8.0.21.tar.gz
+#cp mysql-connector-java-8.0.21/mysql-connector-java-8.0.21.jar /usr/share/tomcat/.guacamole/lib/
+#wget https://downloads.apache.org/guacamole/1.1.0/binary/guacamole-auth-jdbc-1.1.0.tar.gz
+#tar -xzf guacamole-auth-jdbc-1.1.0.tar.gz
+#cp guacamole-auth-jdbc-1.1.0/mysql/guacamole-auth-jdbc-mysql-1.1.0.jar /usr/share/tomcat/.guacamole/extensions/
+#systemctl start mariadb  && systemctl start tomcat
+#mysql_secure_installation
+
+%Press enter when asked “Enter current password for root (enter for none):”
+
+Enter “Y” to set your own root password. This should be different from your normal root user password. Make sure you save this password for future use. For this demo, we are going to use GuacaMole as our password.
+
+Enter “Y” to remove anonymous users, and then “Y” again to disallow remote root login.
+
+Enter “Y” to remove the test database, and finally “Y” again to reload the privilege tables.
+%
+
+****Step 12: Configure the tables and database scheme so that Guacamole can store connection and user information in the database****
+#mysql -u root -p
+
+
+
+***Step 13: Enter the following lines of SQL once you’ve been greeted with the MariaDB prompt*****
+> CREATE DATABASE IF NOT EXISTS guacdb DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
+> GRANT SELECT,INSERT,UPDATE,DELETE ON guacdb.* TO ‘guacuser’@’localhost’ IDENTIFIED BY ‘guacpass’ WITH GRANT OPTION;
+> flush privileges;
+> quit
+
+
+
+****Step 14: Download and extract the guacamole client, and cat the .sql files to mysql from inside the jbdc folder****
+#wget https://downloads.apache.org/guacamole/1.1.0/source/guacamole-client-1.1.0.tar.gz
+#tar -xzf guacamole-client-1.1.0.tar.gz
+#cat guacamole-client-1.1.0/extensions/guacamole-auth-jdbc/modules/guacamole-auth-jdbc-mysql/schema/*.sql | mysql -u root -p guacdb
+
+
+****Step 15: Create the Guacamole configuration file.****
+#mkdir -p /etc/guacamole/ && vi /etc/guacamole/guacamole.properties
+Paste the following into the file:
+--------------------------------------------------------------------
+# MySQL properties
+mysql-hostname: localhost
+mysql-port: 3306
+mysql-database: guacdb
+mysql-username: guacuser
+mysql-password: guacpass
+#Additional settings
+mysql-default-max-connections-per-user: 0
+mysql-default-max-group-connections-per-user: 0
+
+
+***Step 16: Fix some file permissions and create a symbolic link****
+#chmod 0400 /etc/guacamole/guacamole.properties
+#chown tomcat:tomcat /etc/guacamole/guacamole.properties
+#ln -s /etc/guacamole/guacamole.properties /usr/share/tomcat/.guacamole/
+#chown tomcat:tomcat /var/lib/tomcat/webapps/guacamole.war
+
+
+
+****Step 17: To MySQL/MariaDB to communicate correctly with Guacamole, we have to specify our timezone in /etc/my.cnf****
+default-time-zone='+9:30'
+
+change timezone to current timezone
+
+
+
+*****Step 18: Fix a permission issue with SELinux that will prevent Guacamole from working correctly****
+#setsebool -P tomcat_can_network_connect_db on
+#restorecon -R -v /usr/share/tomcat/.guacamole/lib/mysql-connector-java-8.0.18.jar
+
+
+Step 19: Reboot the system and Open the browser
+
+localhost(ip):8080/guacamole/#/
+
+
+
+Default username and password will be “guacadmin”. It is recommended to change the password after signing in for the first time.
+settings >> preferences >> update password
+
+
+
+
