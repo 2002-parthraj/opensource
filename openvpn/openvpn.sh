@@ -1,6 +1,23 @@
 curl -O https://raw.githubusercontent.com/angristan/openvpn-install/master/openvpn-install.sh
 chmod +x openvpn-install.sh
 
+change ip of (static ip )
+Do you want to enable IPv6 support (NAT)? [y/n]: n
+Port choice [1-3]: 1
+Protocol [1-2]: 1
+DNS [1-12]: 1
+Enable compression? [y/n]: n
+Customize encryption settings? [y/n]: y
+Cipher [1-6]: 1
+Certificate key type [1-2]: 1
+Curve [1-3]: 1
+Control channel cipher [1-2]: 1
+DH key type [1-2]: 1
+Curve [1-3]: 1
+Digest algorithm [1-3]: 1
+Control channel additional security mechanism [1-2]: 1
+
+
 **************************************script-start******************************************************
 
 #!/bin/bash
